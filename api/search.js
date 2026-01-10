@@ -19,7 +19,7 @@ export default async function handler(req) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      api_key: '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',
+      api_key: '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',
       query,
       search_depth: 'basic',
       max_results: 6
