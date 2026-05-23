@@ -55,7 +55,7 @@ module.exports = async (req, res) => {
       include_answer: false,
     }),
   });
-
+ 
   res.status(upstream.status);
   res.setHeader('Content-Type', 'application/json');
   res.send(await upstream.text());
