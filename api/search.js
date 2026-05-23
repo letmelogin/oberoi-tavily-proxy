@@ -1,37 +1,61 @@
-export const config = { runtime: 'edge' };
+// api/search.js — Tavily search proxy on Vercel
 
-export default async function handler(req) {
+const ALLOWED_ORIGINS = new Set([
+  'https://theoberois.com',
+  'https://www.theoberois.com',
+  'http://localhost:3000',
+]);
+
+function applyCors(req, res) {
+  const origin = req.headers.origin;
+  res.setHeader(
+    'Access-Control-Allow-Origin',
+    origin && ALLOWED_ORIGINS.has(origin) ? origin : '*'
+  );
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Max-Age', '86400');
+}
+
+module.exports = async (req, res) => {
+  applyCors(req, res);
+
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      }
-    });
+    res.status(204).end();
+    return;
+  }
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
   }
 
-  if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
+  const key = process.env.TAVILY_API_KEY;
+  if (!key) {
+    res.status(500).json({ error: 'TAVILY_API_KEY not configured on Vercel' });
+    return;
+  }
 
-  const { query } = await req.json();
+  let body;
+  try {
+    body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+  } catch (_) {
+    res.status(400).json({ error: 'Invalid JSON' });
+    return;
+  }
 
-  const res = await fetch('https://api.tavily.com/search', {
+  const upstream = await fetch('https://api.tavily.com/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      api_key: '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',
-      query,
-      search_depth: 'basic',
-      max_results: 6
-    })
+      api_key: key,
+      query: body.query || '',
+      search_depth: body.search_depth || 'basic',
+      max_results: body.max_results || 5,
+    }),
   });
 
-  const data = await res.json();
-
-  return new Response(JSON.stringify(data), {
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-    }
-  });
-}
+  res.status(upstream.status);
+  res.setHeader('Content-Type', 'application/json');
+  res.send(await upstream.text());
+};
