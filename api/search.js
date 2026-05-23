@@ -52,6 +52,7 @@ module.exports = async (req, res) => {
       query: body.query || '',
       search_depth: body.search_depth || 'basic',
       max_results: body.max_results || 5,
+      include_answer: false,
     }),
   });
 
